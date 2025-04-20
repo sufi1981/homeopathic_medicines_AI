@@ -46,17 +46,24 @@ def suggest_medicines(symptom: str = Query(...), db: Session = Depends(get_db)):
 @app.get("/ai-suggest")
 def ai_suggest(symptom: str, db: Session = Depends(get_db)):
     try:
-        # Fetch all medicines from the database
+        # Check if input symptom is too short or gibberish
+        if len(symptom.strip()) < 3 or not any(char.isalpha() for char in symptom):
+            raise HTTPException(status_code=400, detail="❌ Invalid symptom input.")
+
+        # Optionally, check if symptom is in database
+        if not crud.get_symptom_by_name(db, symptom):
+            raise HTTPException(status_code=404, detail="❌ Symptom not recognized.")
+
         homeo_meds = crud.get_homeo_meds(db=db)
         possible_meds = [med.name for med in homeo_meds]
 
-        # AI model will suggest the best medicine for the given symptom
         best_match = chat_transformer.suggest_medicine_based_on_symptom(symptom, possible_meds)
-
-        # Return the suggested medicine
         return {"suggested_medicine": best_match}
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error in AI suggestion: {e}")
+
+
 
 @app.post("/link-symptom-medicine/")
 def link_symptom_medicine(symptom_id: int = Body(...), medicine_id: int = Body(...), db: Session = Depends(get_db)):
